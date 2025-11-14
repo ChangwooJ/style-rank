@@ -14,7 +14,7 @@ export function calculateComplexity(ast: File): number {
     ConditionalExpression() {
       complexity++;
     },
- 
+
     // and, or
     LogicalExpression(path: NodePath<LogicalExpression>) {
       const operator = path.node.operator;
