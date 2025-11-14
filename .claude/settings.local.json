@@ -4,7 +4,9 @@
       "Bash(\"c:\\Users\\wjdck\\Desktop\\memo-jung\\style-rank\\src\\complexity.ts\")",
       "Bash(touch:*)",
       "Bash(npm run compile:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm run package:*)",
+      "Bash(vsce package:*)"
     ],
     "deny": [],
     "ask": []

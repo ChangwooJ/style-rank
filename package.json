@@ -1,8 +1,9 @@
 {
   "name": "style-rank",
-  "displayName": "style-rank",
+  "displayName": "Style Rank",
   "description": "AST 기반 코드 품질 랭크 측정기",
   "version": "0.0.1",
+  "publisher": "style-rank",
   "engines": {
     "vscode": "^1.105.0"
   },

@@ -1,71 +1,60 @@
-# style-rank README
+# Style Rank
 
-This is the README for your extension "style-rank". After writing up a brief description, we recommend including the following sections.
+AST 기반 코드 복잡도 분석 및 랭크 측정 VSCode 확장 프로그램
 
-## Features
+## 기능
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+**Style Rank**는 JavaScript/TypeScript 코드의 순환 복잡도(Cyclomatic Complexity)를 자동으로 측정하고 S/A/B/C/D/F 등급으로 시각화합니다.
 
-For example if there is an image subfolder under your extension project workspace:
+### 주요 기능
+- 파일 저장 시 자동으로 코드 복잡도 분석
+- VSCode 하단 상태바에 실시간 랭크 표시
+- JavaScript, TypeScript, JSX, TSX 파일 지원
+- AST 기반 정확한 분석
 
-\!\[feature X\]\(images/feature-x.png\)
+### 분석 대상
+다음 구문들을 기준으로 순환 복잡도를 계산합니다:
+- `if` 문
+- `for`, `while` 반복문
+- 삼항 연산자 (`? :`)
+- 논리 연산자 (`&&`, `||`)
+- `switch` 문의 각 `case`
+- `try-catch`의 `catch` 블록
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+### 등급 기준
+| 복잡도 | 등급 | 설명 |
+|--------|------|------|
+| 1-5 | S | 매우 우수 - 단순하고 이해하기 쉬운 코드 |
+| 6-10 | A | 우수 - 적절한 복잡도 |
+| 11-15 | B | 보통 - 약간 복잡, 리팩토링 고려 |
+| 16-20 | C | 주의 - 복잡함, 리팩토링 권장 |
+| 21-30 | D | 나쁨 - 매우 복잡, 즉시 리팩토링 필요 |
+| 31+ | F | 위험 - 유지보수 불가능 수준 |
 
-## Requirements
+## 사용 방법
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+1. JavaScript, TypeScript, JSX, 또는 TSX 파일을 열기
+2. 파일을 저장 (Ctrl+S 또는 Cmd+S)
+3. VSCode 하단 우측 상태바에서 코드 랭크 확인
 
-## Extension Settings
+## 요구사항
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+- Visual Studio Code 1.105.0 이상
 
-For example:
+## 알려진 이슈
 
-This extension contributes the following settings:
+현재 파일 전체의 복잡도만 측정합니다. 함수별 개별 측정 기능은 향후 추가 예정입니다.
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+## 릴리즈 노트
 
-## Known Issues
+### 0.0.1
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+초기 릴리즈
+- AST 기반 순환 복잡도 계산
+- S/A/B/C/D/F 랭킹 시스템
+- 상태바 실시간 표시
+- JavaScript/TypeScript/JSX/TSX 지원
 
 ---
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
 
 **Enjoy!**
