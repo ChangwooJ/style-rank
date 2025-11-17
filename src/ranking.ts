@@ -16,14 +16,33 @@ export function assignRank(complexity: number): Rank {
   }
 }
 
+export function assignRefinedRank(ccs: number, violationCount: number): Rank {
+  const violationPenalty = violationCount * 5;
+  const finalScore = ccs + violationPenalty;
+
+  if (finalScore <= 5 && violationCount === 0) {
+    return 'S';
+  } else if (finalScore <= 10 && violationCount <= 1) {
+    return 'A';
+  } else if (finalScore <= 20 && violationCount <= 3) {
+    return 'B';
+  } else if (finalScore <= 30 && violationCount <= 5) {
+    return 'C';
+  } else if (finalScore <= 40 || violationCount <= 8) {
+    return 'D';
+  } else {
+    return 'F';
+  }
+}
+
 export function getRankDescription(rank: Rank): string {
   const descriptions: Record<Rank, string> = {
-    S: '매우 우수 - 단순하고 이해하기 쉬운 코드',
-    A: '우수 - 적절한 복잡도',
-    B: '보통 - 약간 복잡, 리팩토링 고려',
-    C: '주의 - 복잡함, 리팩토링 권장',
-    D: '나쁨 - 매우 복잡, 즉시 리팩토링 필요',
-    F: '위험 - 유지보수 불가능 수준',
+    S: '완벽 - 클린하고 이해하기 쉬운 코드',
+    A: '우수 - 가독성과 유지보수성이 높은 코드',
+    B: '양호 - 약간의 개선 여지가 있는 코드',
+    C: '주의 - 복잡도 또는 코드 스타일 개선 필요',
+    D: '나쁨 - 즉시 리팩토링 권장',
+    F: '위험 - 긴급 리팩토링 필수',
   };
 
   return descriptions[rank];
