@@ -2,33 +2,69 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { parseCodeToAST } from './analyzer';
-import { calculateComplexity } from './complexity';
-import { assignRank, getRankDescription } from './ranking';
+import { calculateRefinedComplexityScore } from './complexity';
+import { assignRefinedRank, getRankDescription } from './ranking';
+import { checkCleanCodeRules, formatViolations } from './cleanCodeRules';
 import { StatusBarManager } from './statusBar';
 
 export function activate(context: vscode.ExtensionContext) {
-  // 상태바 매니저 초기화
   const statusBarManager = new StatusBarManager();
   context.subscriptions.push(statusBarManager);
 
-  // 코드 분석 함수
   const analyzeCode = (code: string, fileName: string) => {
     try {
       const ast = parseCodeToAST(code);
-      const complexity = calculateComplexity(ast);
-      const rank = assignRank(complexity);
+
+      const complexityResult = calculateRefinedComplexityScore(ast);
+      const { ccs, cognitiveComplexity, lengthPenalty, maxNestingDepth } = complexityResult;
+
+      const cleanCodeResult = checkCleanCodeRules(ast);
+      const { violations, violationCount } = cleanCodeResult;
+
+      const rank = assignRefinedRank(ccs, violationCount);
       const rankDescription = getRankDescription(rank);
 
-      console.log('--- Analysis Result ---');
-      console.log('File:', fileName);
-      console.log('Cyclomatic Complexity:', complexity);
-      console.log('Rank:', rank);
-      console.log('Description:', rankDescription);
+      console.log('==================================================');
+      console.log('📊 Style Rank Analysis Result');
+      console.log('==================================================');
+      console.log('📁 File:', fileName);
+      console.log('--------------------------------------------------');
+      console.log('🔢 Complexity Metrics:');
+      console.log(`   - CCS (Refined): ${ccs.toFixed(1)}`);
+      console.log(`   - Cognitive Complexity: ${cognitiveComplexity}`);
+      console.log(`   - Max Nesting Depth: ${maxNestingDepth}`);
+      console.log(`   - Length Penalty: ${lengthPenalty}`);
+      console.log('--------------------------------------------------');
+      console.log('🧹 Clean Code Violations:', violationCount);
+      if (violationCount > 0) {
+        console.log(formatViolations(violations));
+      }
+      console.log('--------------------------------------------------');
+      console.log(`🏆 Final Rank: ${rank}`);
+      console.log(`📝 ${rankDescription}`);
+      console.log('==================================================\n');
 
-      // 상태바 업데이트
-      statusBarManager.updateRank(rank, complexity, rankDescription);
+      const detailedTooltip = [
+        `종합 복잡도 점수: ${ccs.toFixed(1)}`,
+        `인지 복잡도: ${cognitiveComplexity}`,
+        `최대 중첩 깊이: ${maxNestingDepth}`,
+        `클린 코드 위반: ${violationCount}건`,
+        '',
+        rankDescription,
+      ].join('\n');
 
-      return { complexity, rank, rankDescription };
+      statusBarManager.updateRank(rank, Math.round(ccs), detailedTooltip);
+
+      return {
+        ccs,
+        cognitiveComplexity,
+        lengthPenalty,
+        maxNestingDepth,
+        violationCount,
+        violations,
+        rank,
+        rankDescription,
+      };
     } catch (e) {
       console.error('Error analyzing code:', e);
       statusBarManager.hide();
@@ -36,12 +72,10 @@ export function activate(context: vscode.ExtensionContext) {
     }
   };
 
-  // 파일 저장 이벤트 리스너
   const saveListener = vscode.workspace.onDidSaveTextDocument((document) => {
     console.log('File saved:', document.fileName);
     console.log('Language ID:', document.languageId);
 
-    // TypeScript/JavaScript 파일만 분석
     const supportedLanguages = ['typescript', 'javascript', 'typescriptreact', 'javascriptreact'];
 
     if (!supportedLanguages.includes(document.languageId)) {
@@ -60,7 +94,6 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  // 테스트 명령어
   const testCommand = vscode.commands.registerCommand(
     'style-rank.helloWorld',
     async () => {
@@ -74,9 +107,15 @@ export function activate(context: vscode.ExtensionContext) {
         const testCode = fs.readFileSync(sampleFilePath, 'utf-8');
         const result = analyzeCode(testCode, 'sample1.js');
 
-        vscode.window.showInformationMessage(
-          `[${result.rank}] 순환 복잡도: ${result.complexity} - ${result.rankDescription}`
-        );
+        const message = [
+          `🏆 Rank: ${result.rank}`,
+          `📊 CCS: ${result.ccs.toFixed(1)}`,
+          `🧹 Violations: ${result.violationCount}건`,
+          ``,
+          result.rankDescription,
+        ].join('\n');
+
+        vscode.window.showInformationMessage(message);
       } catch (e) {
         console.error('Error:', e);
         vscode.window.showErrorMessage(
