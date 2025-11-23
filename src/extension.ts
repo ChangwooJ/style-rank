@@ -6,12 +6,25 @@ import { calculateRefinedComplexityScore } from './complexity';
 import { assignRefinedRank, getRankDescription } from './ranking';
 import { checkCleanCodeRules, formatViolations } from './cleanCodeRules';
 import { StatusBarManager } from './statusBar';
+import { formatDetailedReport, type AnalysisResult } from './suggestions';
 
 export function activate(context: vscode.ExtensionContext) {
-  const statusBarManager = new StatusBarManager();
+  let lastAnalysisResult: AnalysisResult | null = null;
+
+  const statusBarManager = new StatusBarManager('style-rank.showDetails');
   context.subscriptions.push(statusBarManager);
 
-  const analyzeCode = (code: string, fileName: string) => {
+  const showDetailedReport = () => {
+    if (!lastAnalysisResult) {
+      vscode.window.showInformationMessage('분석 결과가 없습니다. 파일을 저장하여 분석을 시작하세요.');
+      return;
+    }
+
+    const report = formatDetailedReport(lastAnalysisResult);
+    vscode.window.showInformationMessage(report, { modal: false });
+  };
+
+  const analyzeCode = (code: string, fileName: string, showPopup: boolean = false) => {
     try {
       const ast = parseCodeToAST(code);
 
@@ -24,26 +37,6 @@ export function activate(context: vscode.ExtensionContext) {
       const rank = assignRefinedRank(ccs, violationCount);
       const rankDescription = getRankDescription(rank);
 
-      console.log('==================================================');
-      console.log('📊 Style Rank Analysis Result');
-      console.log('==================================================');
-      console.log('📁 File:', fileName);
-      console.log('--------------------------------------------------');
-      console.log('🔢 Complexity Metrics:');
-      console.log(`   - CCS (Refined): ${ccs.toFixed(1)}`);
-      console.log(`   - Cognitive Complexity: ${cognitiveComplexity}`);
-      console.log(`   - Max Nesting Depth: ${maxNestingDepth}`);
-      console.log(`   - Length Penalty: ${lengthPenalty}`);
-      console.log('--------------------------------------------------');
-      console.log('🧹 Clean Code Violations:', violationCount);
-      if (violationCount > 0) {
-        console.log(formatViolations(violations));
-      }
-      console.log('--------------------------------------------------');
-      console.log(`🏆 Final Rank: ${rank}`);
-      console.log(`📝 ${rankDescription}`);
-      console.log('==================================================\n');
-
       const detailedTooltip = [
         `종합 복잡도 점수: ${ccs.toFixed(1)}`,
         `인지 복잡도: ${cognitiveComplexity}`,
@@ -55,7 +48,7 @@ export function activate(context: vscode.ExtensionContext) {
 
       statusBarManager.updateRank(rank, Math.round(ccs), detailedTooltip);
 
-      return {
+      lastAnalysisResult = {
         ccs,
         cognitiveComplexity,
         lengthPenalty,
@@ -65,6 +58,12 @@ export function activate(context: vscode.ExtensionContext) {
         rank,
         rankDescription,
       };
+
+      if (showPopup) {
+        showDetailedReport();
+      }
+
+      return lastAnalysisResult;
     } catch (e) {
       console.error('Error analyzing code:', e);
       statusBarManager.hide();
@@ -73,26 +72,25 @@ export function activate(context: vscode.ExtensionContext) {
   };
 
   const saveListener = vscode.workspace.onDidSaveTextDocument((document) => {
-    console.log('File saved:', document.fileName);
-    console.log('Language ID:', document.languageId);
-
     const supportedLanguages = ['typescript', 'javascript', 'typescriptreact', 'javascriptreact'];
 
     if (!supportedLanguages.includes(document.languageId)) {
-      console.log('Skipping - not a supported language');
+      console.log('지원하지 않는 언어입니다.');
       return;
     }
 
     try {
       const code = document.getText();
       const fileName = path.basename(document.fileName);
-      analyzeCode(code, fileName);
+      analyzeCode(code, fileName, true);
     } catch (e) {
       vscode.window.showErrorMessage(
         `코드 분석 중 오류가 발생했습니다: ${e instanceof Error ? e.message : String(e)}`
       );
     }
   });
+
+  const showDetailsCommand = vscode.commands.registerCommand('style-rank.showDetails', showDetailedReport);
 
   const testCommand = vscode.commands.registerCommand(
     'style-rank.helloWorld',
@@ -105,17 +103,7 @@ export function activate(context: vscode.ExtensionContext) {
         );
 
         const testCode = fs.readFileSync(sampleFilePath, 'utf-8');
-        const result = analyzeCode(testCode, 'sample1.js');
-
-        const message = [
-          `🏆 Rank: ${result.rank}`,
-          `📊 CCS: ${result.ccs.toFixed(1)}`,
-          `🧹 Violations: ${result.violationCount}건`,
-          ``,
-          result.rankDescription,
-        ].join('\n');
-
-        vscode.window.showInformationMessage(message);
+        analyzeCode(testCode, 'sample1.js', true);
       } catch (e) {
         console.error('Error:', e);
         vscode.window.showErrorMessage(
@@ -125,5 +113,5 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  context.subscriptions.push(saveListener, testCommand);
+  context.subscriptions.push(saveListener, showDetailsCommand, testCommand);
 }

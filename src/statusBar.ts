@@ -4,11 +4,12 @@ import type { Rank } from './ranking';
 export class StatusBarManager {
   private statusBarItem: vscode.StatusBarItem;
 
-  constructor() {
+  constructor(commandId: string) {
     this.statusBarItem = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Right,
       100
     );
+    this.statusBarItem.command = commandId;
   }
 
   updateRank(rank: Rank, complexity: number, description: string): void {
@@ -16,7 +17,7 @@ export class StatusBarManager {
     const color = this.getRankColor(rank);
 
     this.statusBarItem.text = `${icon} Rank: ${rank}`;
-    this.statusBarItem.tooltip = `순환 복잡도: ${complexity}\n${description}`;
+    this.statusBarItem.tooltip = `순환 복잡도: ${complexity}\n${description}\n\n클릭하여 상세 보기`;
     this.statusBarItem.backgroundColor = color;
     this.statusBarItem.show();
   }
