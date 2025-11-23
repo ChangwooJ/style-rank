@@ -77,7 +77,9 @@ export function checkCleanCodeRules(ast: File): CleanCodeResult {
       if (
         parent.type === 'MemberExpression' ||
         parent.type === 'ObjectProperty' ||
-        parent.type === 'ArrayExpression'
+        parent.type === 'ArrayExpression' ||
+        parent.type === 'JSXExpressionContainer' ||
+        parent.type === 'VariableDeclarator'
       ) {
         return;
       }
