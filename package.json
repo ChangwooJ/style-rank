@@ -2,7 +2,7 @@
   "name": "style-rank",
   "displayName": "Style Rank",
   "description": "AST 기반 코드 품질 랭크 측정기",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "publisher": "style-rank",
   "repository": {
     "type": "git",
