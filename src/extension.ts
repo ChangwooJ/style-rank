@@ -6,12 +6,15 @@ import { calculateRefinedComplexityScore } from './complexity';
 import { assignRefinedRank, getRankDescription } from './ranking';
 import { checkCleanCodeRules, formatViolations } from './cleanCodeRules';
 import { StatusBarManager } from './statusBar';
-import { formatDetailedReport, type AnalysisResult } from './suggestions';
+import { type AnalysisResult } from './suggestions';
+import { QuickPickManager } from './quickPickManager';
 
 export function activate(context: vscode.ExtensionContext) {
   let lastAnalysisResult: AnalysisResult | null = null;
 
   const statusBarManager = new StatusBarManager('style-rank.showDetails');
+  const quickPickManager = new QuickPickManager();
+
   context.subscriptions.push(statusBarManager);
 
   const showDetailedReport = () => {
@@ -20,22 +23,41 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    const report = formatDetailedReport(lastAnalysisResult);
-    vscode.window.showInformationMessage(report, { modal: false });
+    quickPickManager.showAnalysisResult(lastAnalysisResult);
   };
 
-  const analyzeCode = (code: string, fileName: string, showPopup: boolean = false) => {
+  const analyzeCode = (code: string, fileName: string, filePath: string, showOutput: boolean = false) => {
     try {
       const ast = parseCodeToAST(code);
 
       const complexityResult = calculateRefinedComplexityScore(ast);
-      const { ccs, cognitiveComplexity, lengthPenalty, maxNestingDepth } = complexityResult;
+      const { ccs, cognitiveComplexity, lengthPenalty, maxNestingDepth, longFunctions, complexityHotspots } = complexityResult;
 
       const cleanCodeResult = checkCleanCodeRules(ast);
       const { violations, violationCount } = cleanCodeResult;
 
       const rank = assignRefinedRank(ccs, violationCount);
       const rankDescription = getRankDescription(rank);
+
+      console.log('==================================================');
+      console.log('📊 Style Rank Analysis Result');
+      console.log('==================================================');
+      console.log('📁 File:', fileName);
+      console.log('--------------------------------------------------');
+      console.log('🔢 Complexity Metrics:');
+      console.log(`   - CCS (Refined): ${ccs.toFixed(1)}`);
+      console.log(`   - Cognitive Complexity: ${cognitiveComplexity}`);
+      console.log(`   - Max Nesting Depth: ${maxNestingDepth}`);
+      console.log(`   - Length Penalty: ${lengthPenalty}`);
+      console.log('--------------------------------------------------');
+      console.log('🧹 Clean Code Violations:', violationCount);
+      if (violationCount > 0) {
+        console.log(formatViolations(violations));
+      }
+      console.log('--------------------------------------------------');
+      console.log(`🏆 Final Rank: ${rank}`);
+      console.log(`📝 ${rankDescription}`);
+      console.log('==================================================\n');
 
       const detailedTooltip = [
         `종합 복잡도 점수: ${ccs.toFixed(1)}`,
@@ -57,10 +79,13 @@ export function activate(context: vscode.ExtensionContext) {
         violations,
         rank,
         rankDescription,
+        longFunctions,
+        complexityHotspots,
+        filePath,
       };
 
-      if (showPopup) {
-        showDetailedReport();
+      if (showOutput) {
+        quickPickManager.showAnalysisResult(lastAnalysisResult);
       }
 
       return lastAnalysisResult;
@@ -82,7 +107,8 @@ export function activate(context: vscode.ExtensionContext) {
     try {
       const code = document.getText();
       const fileName = path.basename(document.fileName);
-      analyzeCode(code, fileName, true);
+      const filePath = document.fileName;
+      analyzeCode(code, fileName, filePath, true);
     } catch (e) {
       vscode.window.showErrorMessage(
         `코드 분석 중 오류가 발생했습니다: ${e instanceof Error ? e.message : String(e)}`
@@ -103,7 +129,7 @@ export function activate(context: vscode.ExtensionContext) {
         );
 
         const testCode = fs.readFileSync(sampleFilePath, 'utf-8');
-        analyzeCode(testCode, 'sample1.js', true);
+        analyzeCode(testCode, 'sample1.js', sampleFilePath, true);
       } catch (e) {
         console.error('Error:', e);
         vscode.window.showErrorMessage(

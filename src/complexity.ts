@@ -36,15 +36,31 @@ export function calculateComplexity(ast: File): number {
   return complexity;
 }
 
-export function calculateCognitiveComplexity(ast: File): number {
+export interface ComplexityHotspot {
+  type: string;
+  line: number;
+  nestingLevel: number;
+  functionName?: string;
+}
+
+export function calculateCognitiveComplexity(ast: File): {
+  complexity: number;
+  hotspots: ComplexityHotspot[];
+} {
   let cognitiveComplexity = 0;
   let nestingLevel = 0;
-  let maxNestingDepth = 0;
+  const hotspots: ComplexityHotspot[] = [];
+  let currentFunctionName: string | undefined;
 
   traverse(ast, {
     'FunctionDeclaration|FunctionExpression|ArrowFunctionExpression': {
-      enter() {
+      enter(path) {
         nestingLevel = 0;
+        if (path.node.type === 'FunctionDeclaration' && path.node.id) {
+          currentFunctionName = path.node.id.name;
+        } else {
+          currentFunctionName = undefined;
+        }
       },
     },
 
@@ -59,9 +75,19 @@ export function calculateCognitiveComplexity(ast: File): number {
         if (isEarlyReturn) {
           cognitiveComplexity += 1;
         } else {
-          cognitiveComplexity += 1 + nestingLevel;
+          const complexity = 1 + nestingLevel;
+          cognitiveComplexity += complexity;
+
+          if (nestingLevel >= 2) {
+            hotspots.push({
+              type: 'IfStatement',
+              line: path.node.loc?.start.line || 0,
+              nestingLevel,
+              functionName: currentFunctionName,
+            });
+          }
+
           nestingLevel++;
-          maxNestingDepth = Math.max(maxNestingDepth, nestingLevel);
         }
       },
       exit(path: NodePath<IfStatement>) {
@@ -77,8 +103,17 @@ export function calculateCognitiveComplexity(ast: File): number {
       },
     },
 
-    ConditionalExpression() {
+    ConditionalExpression(path) {
       cognitiveComplexity += 1 + nestingLevel;
+
+      if (nestingLevel >= 2) {
+        hotspots.push({
+          type: 'ConditionalExpression',
+          line: path.node.loc?.start.line || 0,
+          nestingLevel,
+          functionName: currentFunctionName,
+        });
+      }
     },
 
     LogicalExpression(path: NodePath<LogicalExpression>) {
@@ -91,26 +126,57 @@ export function calculateCognitiveComplexity(ast: File): number {
     SwitchCase(path: NodePath<SwitchCase>) {
       if (path.node.test !== null) {
         cognitiveComplexity += 1 + nestingLevel;
+
+        if (nestingLevel >= 2) {
+          hotspots.push({
+            type: 'SwitchCase',
+            line: path.node.loc?.start.line || 0,
+            nestingLevel,
+            functionName: currentFunctionName,
+          });
+        }
       }
     },
 
     'ForStatement|WhileStatement|DoWhileStatement|ForInStatement|ForOfStatement': {
-      enter() {
-        cognitiveComplexity += 1 + nestingLevel;
+      enter(path) {
+        const complexity = 1 + nestingLevel;
+        cognitiveComplexity += complexity;
+
+        if (nestingLevel >= 2) {
+          hotspots.push({
+            type: path.node.type,
+            line: path.node.loc?.start.line || 0,
+            nestingLevel,
+            functionName: currentFunctionName,
+          });
+        }
+
         nestingLevel++;
-        maxNestingDepth = Math.max(maxNestingDepth, nestingLevel);
       },
       exit() {
         nestingLevel--;
       },
     },
 
-    CatchClause() {
+    CatchClause(path) {
       cognitiveComplexity += 1 + nestingLevel;
+
+      if (nestingLevel >= 2) {
+        hotspots.push({
+          type: 'CatchClause',
+          line: path.node.loc?.start.line || 0,
+          nestingLevel,
+          functionName: currentFunctionName,
+        });
+      }
     },
   });
 
-  return cognitiveComplexity;
+  return {
+    complexity: cognitiveComplexity,
+    hotspots,
+  };
 }
 
 export function calculateMaxNestingDepth(ast: File): number {
@@ -138,9 +204,19 @@ export function calculateMaxNestingDepth(ast: File): number {
   return maxDepth;
 }
 
-export function calculateLengthPenalty(ast: File): number {
+export interface LongFunction {
+  name: string;
+  startLine: number;
+  endLine: number;
+  length: number;
+}
+
+export function calculateLengthPenalty(ast: File): {
+  penalty: number;
+  longFunctions: LongFunction[];
+} {
   const MAX_RECOMMENDED_LENGTH = 30;
-  let maxFunctionLength = 0;
+  const longFunctions: LongFunction[] = [];
 
   traverse(ast, {
     'FunctionDeclaration|FunctionExpression|ArrowFunctionExpression'(path) {
@@ -148,18 +224,44 @@ export function calculateLengthPenalty(ast: File): number {
       const endLine = path.node.loc?.end.line || 0;
       const functionLength = endLine - startLine + 1;
 
-      maxFunctionLength = Math.max(maxFunctionLength, functionLength);
+      let hasJSX = false;
+      path.traverse({
+        JSXElement() {
+          hasJSX = true;
+        },
+        JSXFragment() {
+          hasJSX = true;
+        },
+      });
+
+      if (hasJSX) {
+        return;
+      }
+
+      if (functionLength > MAX_RECOMMENDED_LENGTH) {
+        const functionName =
+          path.node.type === 'FunctionDeclaration' && path.node.id
+            ? path.node.id.name
+            : '익명 함수';
+
+        longFunctions.push({
+          name: functionName,
+          startLine,
+          endLine,
+          length: functionLength,
+        });
+      }
     },
   });
 
-  const totalLines = ast.loc?.end.line || 0;
-  const effectiveLength = Math.max(maxFunctionLength, totalLines);
+  const maxPenalty = longFunctions.length > 0
+    ? Math.max(...longFunctions.map(f => Math.floor((f.length - MAX_RECOMMENDED_LENGTH) / 10)))
+    : 0;
 
-  if (effectiveLength <= MAX_RECOMMENDED_LENGTH) {
-    return 0;
-  }
-
-  return Math.floor((effectiveLength - MAX_RECOMMENDED_LENGTH) / 10);
+  return {
+    penalty: maxPenalty,
+    longFunctions,
+  };
 }
 
 export function calculateRefinedComplexityScore(ast: File): {
@@ -167,17 +269,21 @@ export function calculateRefinedComplexityScore(ast: File): {
   cognitiveComplexity: number;
   lengthPenalty: number;
   maxNestingDepth: number;
+  longFunctions: LongFunction[];
+  complexityHotspots: ComplexityHotspot[];
 } {
-  const cognitiveComplexity = calculateCognitiveComplexity(ast);
-  const lengthPenalty = calculateLengthPenalty(ast);
+  const cognitiveResult = calculateCognitiveComplexity(ast);
+  const lengthPenaltyResult = calculateLengthPenalty(ast);
   const maxNestingDepth = calculateMaxNestingDepth(ast);
 
-  const ccs = 1.0 * cognitiveComplexity + 0.5 * lengthPenalty;
+  const ccs = 1.0 * cognitiveResult.complexity + 0.5 * lengthPenaltyResult.penalty;
 
   return {
     ccs,
-    cognitiveComplexity,
-    lengthPenalty,
+    cognitiveComplexity: cognitiveResult.complexity,
+    lengthPenalty: lengthPenaltyResult.penalty,
     maxNestingDepth,
+    longFunctions: lengthPenaltyResult.longFunctions,
+    complexityHotspots: cognitiveResult.hotspots,
   };
 }

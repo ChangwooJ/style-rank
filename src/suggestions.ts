@@ -1,5 +1,6 @@
 import type { CleanCodeViolation } from './cleanCodeRules';
 import type { Rank } from './ranking';
+import type { LongFunction, ComplexityHotspot } from './complexity';
 
 export interface AnalysisResult {
   ccs: number;
@@ -10,22 +11,50 @@ export interface AnalysisResult {
   violations: CleanCodeViolation[];
   rank: Rank;
   rankDescription: string;
+  longFunctions: LongFunction[];
+  complexityHotspots: ComplexityHotspot[];
+  filePath?: string;
 }
 
 export function generateSuggestions(result: AnalysisResult): string[] {
   const suggestions: string[] = [];
 
-  if (result.maxNestingDepth >= 3) {
-    suggestions.push(`중첩 깊이가 ${result.maxNestingDepth}입니다.`);
+  if (result.complexityHotspots.length > 0) {
+    const topHotspots = result.complexityHotspots
+      .sort((a, b) => b.nestingLevel - a.nestingLevel)
+      .slice(0, 3);
+
+    topHotspots.forEach(hotspot => {
+      const funcInfo = hotspot.functionName ? ` (${hotspot.functionName} 함수)` : '';
+      const location = result.filePath ? `${result.filePath}:${hotspot.line}` : `Line ${hotspot.line}`;
+
+      suggestions.push(
+        `깊은 중첩 발견${funcInfo}: ${hotspot.type} at ${location}\n` +
+        `  → 중첩 레벨 ${hotspot.nestingLevel} - 깊은 중첩을 개선해주세요`
+      );
+    });
+  } else if (result.maxNestingDepth >= 3) {
+    suggestions.push(`최대 중첩 깊이: ${result.maxNestingDepth}\n  → 깊은 중첩을 개선해주세요`);
   }
 
-  if (result.lengthPenalty > 0) {
-    const estimatedLength = 30 + result.lengthPenalty * 10;
-    suggestions.push(`함수 길이가 약 ${estimatedLength}줄입니다.`);
+  if (result.longFunctions.length > 0) {
+    result.longFunctions.forEach(func => {
+      const location = result.filePath
+        ? `${result.filePath}:${func.startLine}-${func.endLine}`
+        : `Line ${func.startLine}-${func.endLine}`;
+
+      suggestions.push(
+        `긴 함수 발견: ${func.name} (${func.length}줄) at ${location}\n` +
+        `  → 함수를 작은 단위로 분리해주세요`
+      );
+    });
   }
 
-  if (result.cognitiveComplexity > 10) {
-    suggestions.push(`인지 복잡도가 ${result.cognitiveComplexity}입니다. 로직을 작은 함수로 분리하여 가독성을 높여주세요.`);
+  if (result.cognitiveComplexity > 10 && result.complexityHotspots.length === 0) {
+    suggestions.push(
+      `인지 복잡도: ${result.cognitiveComplexity}\n` +
+      `  → 로직을 작은 함수로 분리하여 가독성을 높이세요`
+    );
   }
 
   if (result.violations.length > 0) {
@@ -36,13 +65,13 @@ export function generateSuggestions(result: AnalysisResult): string[] {
 
     violationByRule.forEach((count, rule) => {
       if (rule === 'no-loose-equality') {
-        suggestions.push(`'==' 연산자를 ${count}곳에서 사용 중입니다. 모두 '==='로 변경해주세요.`);
+        suggestions.push(`'==' 연산자 ${count}곳\n  → 모두 '==='로 변경해주세요`);
       } else if (rule === 'no-magic-number') {
-        suggestions.push(`매직 넘버가 ${count}개 발견되었습니다. 의미 있는 상수명으로 선언해주세요.`);
+        suggestions.push(`매직 넘버 ${count}개\n  → 의미 있는 상수명으로 선언해주세요`);
       } else if (rule === 'no-parameter-flag') {
-        suggestions.push(`${count}개 함수에서 파라미터 플래그를 사용 중입니다. 함수를 분리하거나 전략 패턴을 고려해주세요.`);
+        suggestions.push(`파라미터 플래그 ${count}개\n  → 함수 분리 또는 전략 패턴을 고려해주세요`);
       } else if (rule === 'max-parameters') {
-        suggestions.push(`${count}개 함수의 파라미터가 5개를 초과합니다. 객체로 그룹화 해주세요.`);
+        suggestions.push(`파라미터 과다 ${count}개 함수\n  → 객체로 그룹화해주세요`);
       }
     });
   }
