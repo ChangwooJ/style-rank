@@ -2,6 +2,8 @@
 
 AST 기반 코드 품질 분석 및 랭크 측정 VSCode 확장 프로그램
 
+https://marketplace.visualstudio.com/items?itemName=style-rank.style-rank
+
 ## 기능
 
 **Style Rank**는 JavaScript/TypeScript 코드의 복잡도와 클린 코드 규칙을 자동으로 분석하여 S/A/B/C/D/F 등급으로 시각화합니다.
